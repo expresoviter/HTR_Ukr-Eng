@@ -6,6 +6,14 @@ from keras.layers import Dense, Input, Bidirectional, LSTM, Reshape, Dropout
 import numpy as np
 
 class CTCLayer(layers.Layer):
+    """
+        Спеціалізований шар Keras для реалізації CTC втрати.
+
+        Методи:
+        -------
+        call(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor
+            Обчислює CTC втрату між мітками `y_true` та прогнозами `y_pred`.
+        """
 
     def __init__(self, name=None):
         super().__init__(name=name)
@@ -27,6 +35,20 @@ class CTCLayer(layers.Layer):
         return y_pred
 
 class UkrainianRecognition:
+    """
+        Клас для розпізнавання рукописного тексту українською мовою.
+
+        Методи:
+        -------
+        loadImage(path: str) -> tf.Tensor
+            Завантажує зображення з диску, обробляє та підготовує його для подальшого використання в моделі.
+
+        decodeBatchPredictions(pred: np.ndarray, num_to_char: Dict[int, str]) -> str
+            Декодує прогнози моделі в текст.
+
+        main(path: str) -> List[str]
+            Основний метод для обробки зображення та отримання розпізнаного тексту.
+        """
     def loadImage(self, path):
         img = tf.io.read_file(path)
         # 2. Decode and convert to grayscale

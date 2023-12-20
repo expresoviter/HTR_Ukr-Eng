@@ -13,51 +13,49 @@ class Model:
     """
         Клас моделі глибокого навчання для розпізнавання рукописного тексту.
 
-        ---
-
-        Атрибути
-        --------
-        charList: list[str]
+        Атрибути:
+        ---------
+        charList : List[str]
             Список можливих символів для розпізнавання.
-        must_restore: bool
-            Значення, що відповідає за можливість відновлення моделі.
-        snap_ID: int
-            Кількість перезбережень моделі.
-        is_train: tf.Placeholder
-            Відповідає за те, чи використовувати нормалізацію для пакету чи всієї популяції
-        input_imgs: tf.Placeholder
-            Пакет вхідних зображень.
-        batches_trained: int
-            Кількість пакетів, на яких відбулося тренування.
-        update_ops: list
-            Оновлені параметри оптимізатора.
-        optimizer: tf.framework.ops.Operation
-            Обраний оптимізатор для нейронної мережі.
-        sess: tf.session.Session
-            Змінна сесії tensorflow
-        saver: tf.saver.Saver
-            Змінна екземпляру класу збереження tensorflow
+        must_restore : bool
+            Якщо True, модель відновлюється із збереженого стану.
+        snap_ID : int
+            Ідентифікатор для збереження стану моделі.
+        is_train : tf.Placeholder
+            Вказує, чи використовується модель у режимі тренування.
+        input_imgs : tf.Placeholder
+            Вхідні зображення для обробки моделлю.
+        batches_trained : int
+            Кількість тренувальних пакетів, на яких модель вже навчилася.
+        update_ops : list
+            Операції оновлення, використовувані в оптимізаторі.
+        optimizer : tf.framework.ops.Operation
+            Оптимізатор для тренування моделі.
+        sess : tf.session.Session
+            Сесія TensorFlow для виконання операцій моделі.
+        saver : tf.saver.Saver
+            Об'єкт для збереження та відновлення стану моделі.
 
-
-        Методи
-        ------
+        Методи:
+        -------
         setup_cnn()
-            Налаштування convolutional nn
+            Ініціалізація та налаштування конволюційної нейронної мережі (CNN).
         setup_rnn()
-            Налаштування recursional nn
+            Ініціалізація та налаштування рекурентної нейронної мережі (RNN).
         setup_ctc()
-            Налаштування ctc
+            Налаштування Connectionist Temporal Classification (CTC) для декодування виходу мережі.
         setup_tf()
-            Налаштування tensorflow для роботи
-        to_sparse(list[str] texts)
-
-        decoder_output_to_text(tuple ctc_output, int batch_size)
-
-        train_batch(batch Batch)
-
-        infer_batch(Batch batch, bool calc_probability)
-
+            Ініціалізація та налаштування сесії TensorFlow.
+        to_sparse(texts: List[str])
+            Перетворення тексту в розріджений тензор для CTC loss.
+        decoder_output_to_text(ctc_output: tuple, batch_size: int)
+            Конвертує вихід декодера в текст.
+        train_batch(batch: Batch)
+            Тренування моделі на пакеті даних.
+        infer_batch(batch: Batch, calc_probability: bool = False)
+            Розпізнавання тексту з пакету даних.
         save()
+            Збереження поточного стану моделі.
     """
 
     def __init__(self,
@@ -69,24 +67,24 @@ class Model:
         self.must_restore = must_restore
         self.snap_ID = 0
 
-        # Whether to use normalization over a batch or a population
+        # Чи використовувати нормалізацію для пакету або популяції
         self.is_train = tf.compat.v1.placeholder(tf.bool, name='is_train')
 
-        # input image batch
+        # вхідний пакет зображень
         self.input_imgs = tf.compat.v1.placeholder(tf.float32, shape=(None, None, None))
 
-        # setup CNN, RNN and CTC
+        # налаштувати CNN, RNN та CTC
         self.setup_cnn()
         self.setup_rnn()
         self.setup_ctc()
 
-        # setup optimizer to train NN
+        # налаштувати оптимізатор для навчання NN
         self.batches_trained = 0
         self.update_ops = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(self.update_ops):
             self.optimizer = tf.compat.v1.train.AdamOptimizer().minimize(self.loss)
 
-        # initialize TF
+        # налаштувати TF
         self.sess, self.saver = self.setup_tf()
 
     def setup_cnn(self) -> None:
@@ -142,19 +140,19 @@ class Model:
         """Create CTC loss and decoder."""
         # BxTxC -> TxBxC
         self.ctc_in_3d_tbc = tf.transpose(a=self.rnn_out_3d, perm=[1, 0, 2])
-        # ground truth text as sparse tensor
+        # текст як sparse тензор
         self.gt_texts = tf.SparseTensor(tf.compat.v1.placeholder(tf.int64, shape=[None, 2]),
                                         tf.compat.v1.placeholder(tf.int32, [None]),
                                         tf.compat.v1.placeholder(tf.int64, [2]))
 
-        # calc loss for batch
+        # розрахунок втрат для пакету
         self.seq_len = tf.compat.v1.placeholder(tf.int32, [None])
         self.loss = tf.reduce_mean(
             input_tensor=tf.compat.v1.nn.ctc_loss(labels=self.gt_texts, inputs=self.ctc_in_3d_tbc,
                                                   sequence_length=self.seq_len,
                                                   ctc_merge_repeated=True))
 
-        # calc loss for each element to compute label probability
+        # розрахувати втрати для кожного елемента, щоб обчислити ймовірність
         self.saved_ctc_input = tf.compat.v1.placeholder(tf.float32,
                                                         shape=[None, None, len(self.charList) + 1])
         self.loss_per_element = tf.compat.v1.nn.ctc_loss(labels=self.gt_texts, inputs=self.saved_ctc_input,
@@ -170,15 +168,15 @@ class Model:
 
         sess = tf.compat.v1.Session()  # TF session
 
-        saver = tf.compat.v1.train.Saver(max_to_keep=1)  # saver saves model to file
+        saver = tf.compat.v1.train.Saver(max_to_keep=1)  # saver зберігає модель у файл
         model_dir = '../model/'
-        latest_snapshot = tf.train.latest_checkpoint(model_dir)  # is there a saved model?
+        latest_snapshot = tf.train.latest_checkpoint(model_dir)  # чи є збережена модель?
 
-        # if model must be restored (for inference), there must be a snapshot
+        # якщо модель має бути відновлена (для виводу), має бути знімок
         if self.must_restore and not latest_snapshot:
             raise Exception('No saved model found in: ' + model_dir)
 
-        # load saved model if available
+        # завантажити збережену модель, якщо вона доступна
         if latest_snapshot:
             print('Init with stored values from ' + latest_snapshot)
             saver.restore(sess, latest_snapshot)
@@ -192,16 +190,16 @@ class Model:
         """Put ground truth texts into sparse tensor for ctc_loss."""
         indices = []
         values = []
-        shape = [len(texts), 0]  # last entry must be max(labelList[i])
+        shape = [len(texts), 0]  # останній запис повинен бути max(labelList[i])
 
-        # go over all texts
+        # переглянути всі тексти
         for batchElement, text in enumerate(texts):
-            # convert to string of label (i.e. class-ids)
+            # перетворити в рядок мітки (тобто ідентифікатори класів)
             label_str = [self.charList.index(c) for c in text]
-            # sparse tensor must have size of max. label-string
+            # sparse tensor повинен мати розмір max. label-string
             if len(label_str) > shape[1]:
                 shape[1] = len(label_str)
-            # put each label into sparse tensor
+            # помістити кожну мітку у sparse тензор
             for i, label in enumerate(label_str):
                 indices.append([batchElement, i])
                 values.append(label)

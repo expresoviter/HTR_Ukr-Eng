@@ -8,6 +8,34 @@ from dataloaderIAM import Batch
 
 
 class Preprocessor:
+    """
+        Клас попередньої обробки зображень рукописного тексту перед їх подачею в нейронну мережу.
+
+        Атрибути:
+        ---------
+        img_size : Tuple[int, int]
+            Розмір цільового зображення.
+        padding : int
+            Кількість пікселів заповнення з усіх боків зображення.
+        dynamic_width : bool
+            Якщо True, ширина зображення адаптується динамічно.
+        data_augmentation : bool
+            Якщо True, застосовується аугментація даних.
+
+        Методи:
+        -------
+        _truncate_label(text: str, max_text_len: int) -> str
+            Обрізає текстову мітку, якщо її довжина перевищує max_text_len.
+
+        _simulate_text_line(batch: Batch) -> Batch
+            Створює зображення текстового рядка, об'єднуючи декілька слів зображень у одне зображення.
+
+        process_img(img: np.ndarray) -> np.ndarray
+            Змінює розмір зображення до цільового розміру, застосовує аугментацію даних.
+
+        process_batch(batch: Batch) -> Batch
+            Обробляє кожне зображення в пакеті та повертає оброблений пакет.
+        """
     def __init__(self,
                  img_size: Tuple[int, int],
                  padding: int = 0,
@@ -26,9 +54,9 @@ class Preprocessor:
     @staticmethod
     def _truncate_label(text: str, max_text_len: int) -> str:
         """
-        Function ctc_loss can't compute loss if it cannot find a mapping between text label and input
-        labels. Repeat letters cost double because of the blank symbol needing to be inserted.
-        If a too-long label is provided, ctc_loss returns an infinite gradient.
+        Функція ctc_loss не може обчислити втрати, якщо вона не може знайти відповідність між текстовою міткою та вхідними
+        мітками. Повторювані літери коштують вдвічі дорожче, оскільки потрібно вставити порожній символ.
+        Якщо введено надто довгу мітку, ctc_loss повертає нескінченний градієнт.
         """
         cost = 0
         for i in range(len(text)):
@@ -41,7 +69,7 @@ class Preprocessor:
         return text
 
     def _simulate_text_line(self, batch: Batch) -> Batch:
-        """Create image of a text line by pasting multiple word images into an image."""
+        """Створити зображення текстового рядка, вставивши кілька зображень слів у зображення."""
 
         default_word_sep = 30
         default_num_words = 5
@@ -87,7 +115,7 @@ class Preprocessor:
         return Batch(res_imgs, res_gt_texts, batch.batch_size)
 
     def process_img(self, img: np.ndarray) -> np.ndarray:
-        """Resize to target size, apply data augmentation."""
+        """Змініть розмір до потрібного, застосуйте доповнення даних."""
 
         # there are damaged files in IAM dataset - just use black image instead
         if img is None:
